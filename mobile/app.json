@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "ملفات المساجد",
+    "slug": "mosque-dossiers",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "mosquedossiers",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0F766E"
+      },
+      "usesCleartextTraffic": true,
+      "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE", "POST_NOTIFICATIONS"]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-document-picker",
+      "expo-image-picker",
+      "expo-notifications"
+    ]
+  }
+}
