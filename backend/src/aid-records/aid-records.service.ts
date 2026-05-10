@@ -1,5 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { desc, eq } from 'drizzle-orm';
+import { pageLimit } from '../common/pagination';
 import { DB, type AppDb } from '../db/database.module';
 import { aidRecords } from '../db/schema';
 import { MosquesService } from '../mosques/mosques.service';
@@ -13,12 +14,22 @@ export class AidRecordsService {
     private readonly mosquesService: MosquesService,
   ) {}
 
-  async list(mosqueId?: string) {
+  async list(query?: { mosqueId?: string; page?: number; limit?: number } | string) {
+    const mosqueId = typeof query === 'string' ? query : query?.mosqueId;
+    const { limit, offset } = pageLimit(typeof query === 'string' ? undefined : query?.page, typeof query === 'string' ? 30 : (query?.limit ?? 30));
     return this.db
       .select()
       .from(aidRecords)
       .where(mosqueId ? eq(aidRecords.mosqueId, mosqueId) : undefined)
-      .orderBy(desc(aidRecords.aidDate), desc(aidRecords.createdAt));
+      .orderBy(desc(aidRecords.aidDate), desc(aidRecords.createdAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async get(id: string) {
+    const [record] = await this.db.select().from(aidRecords).where(eq(aidRecords.id, id)).limit(1);
+    if (!record) throw new NotFoundException('Aid record not found');
+    return record;
   }
 
   async create(dto: CreateAidRecordDto) {
@@ -50,4 +61,3 @@ export class AidRecordsService {
     return deleted;
   }
 }
-

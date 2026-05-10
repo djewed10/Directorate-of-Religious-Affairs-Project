@@ -14,8 +14,8 @@ export class ExternalUpdateRequestsController {
 
   @ApiBearerAuth()
   @Get('external-update-requests')
-  list(@Query('mosqueId') mosqueId?: string) {
-    return this.externalRequestsService.list(mosqueId);
+  list(@Query() query: { mosqueId?: string; page?: number; limit?: number }) {
+    return this.externalRequestsService.list(query);
   }
 
   @ApiBearerAuth()
@@ -36,4 +36,3 @@ export class ExternalUpdateRequestsController {
     return this.externalRequestsService.submit(token, dto);
   }
 }
-

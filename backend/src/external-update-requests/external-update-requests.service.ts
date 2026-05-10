@@ -1,6 +1,7 @@
 import { BadRequestException, GoneException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { and, desc, eq, or } from 'drizzle-orm';
+import { pageLimit } from '../common/pagination';
 import { customAlphabet, nanoid } from 'nanoid';
 import { ConsumptionService } from '../consumption/consumption.service';
 import { DB, type AppDb } from '../db/database.module';
@@ -27,21 +28,33 @@ export class ExternalUpdateRequestsService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  async list(mosqueId?: string) {
+  async list(query?: { mosqueId?: string; page?: number; limit?: number } | string) {
+    const mosqueId = typeof query === 'string' ? query : query?.mosqueId;
+    const { limit, offset } = pageLimit(typeof query === 'string' ? undefined : query?.page, typeof query === 'string' ? 30 : (query?.limit ?? 30));
     return this.db
       .select({ request: externalUpdateRequests, mosque: mosques })
       .from(externalUpdateRequests)
       .innerJoin(mosques, eq(externalUpdateRequests.mosqueId, mosques.id))
       .where(mosqueId ? eq(externalUpdateRequests.mosqueId, mosqueId) : undefined)
       .orderBy(desc(externalUpdateRequests.createdAt))
-      .limit(100);
+      .limit(limit)
+      .offset(offset);
   }
 
   async create(dto: CreateExternalRequestDto, user: AuthUser) {
     const mosque = await this.mosquesService.ensureExists(dto.mosqueId);
+    if (dto.expiresInDays && dto.expiresInDays > 100) {
+      throw new BadRequestException('أقصى مدة مسموحة هي 100 يوم');
+    }
     const expiresAt = dto.expiresAt
       ? new Date(dto.expiresAt)
       : new Date(Date.now() + (dto.expiresInDays ?? 14) * 24 * 60 * 60 * 1000);
+    if (expiresAt.getTime() > Date.now() + 100 * 24 * 60 * 60 * 1000) {
+      throw new BadRequestException('أقصى مدة مسموحة هي 100 يوم');
+    }
+    if (expiresAt.getTime() < Date.now()) {
+      throw new BadRequestException('تاريخ انتهاء الطلب غير صالح');
+    }
     const [created] = await this.db
       .insert(externalUpdateRequests)
       .values({
@@ -109,8 +122,12 @@ export class ExternalUpdateRequestsService {
     if (row.request.status !== 'pending') throw new GoneException('Request is no longer pending');
     if (row.request.expiresAt < new Date()) throw new GoneException('Request expired');
 
+    let createdConsumptionId: string | undefined;
+    let createdProgressionId: string | undefined;
+    let createdDocumentId: string | undefined;
+
     if (row.request.requestType === 'consumption_control') {
-      await this.consumptionService.create({
+      const consumption = await this.consumptionService.create({
         mosqueId: row.request.mosqueId,
         aidRecordId: dto.aidRecordId,
         sourceKind: 'external',
@@ -121,8 +138,9 @@ export class ExternalUpdateRequestsService {
         externalRequestId: row.request.id,
         media: dto.consumptionMedia,
       });
+      createdConsumptionId = consumption.id;
       if (row.request.allowProgressionFields && (dto.progressPercent !== undefined || dto.progressionMedia?.length || dto.progressionNote)) {
-        await this.progressionService.create({
+        const progression = await this.progressionService.create({
           mosqueId: row.request.mosqueId,
           sourceKind: 'external',
           stageCode: dto.progressionStageCode,
@@ -131,11 +149,12 @@ export class ExternalUpdateRequestsService {
           externalRequestId: row.request.id,
           media: dto.progressionMedia,
         });
+        createdProgressionId = progression.id;
       }
     }
 
     if (row.request.requestType === 'progression_update') {
-      await this.progressionService.create({
+      const progression = await this.progressionService.create({
         mosqueId: row.request.mosqueId,
         sourceKind: 'external',
         stageCode: dto.progressionStageCode,
@@ -144,6 +163,7 @@ export class ExternalUpdateRequestsService {
         externalRequestId: row.request.id,
         media: dto.progressionMedia,
       });
+      createdProgressionId = progression.id;
     }
 
     if (row.request.requestType === 'document_renewal' || row.request.requestType === 'document_upload') {
@@ -160,7 +180,7 @@ export class ExternalUpdateRequestsService {
         documentTypeId = related?.documentTypeId ?? documentTypeId;
       }
       if (!documentTypeId) throw new BadRequestException('Document type is required');
-      await this.documentsService.create({
+      const document = await this.documentsService.create({
         mosqueId: row.request.mosqueId,
         documentTypeId,
         sourceKind: row.request.requestType === 'document_renewal' ? 'renewal_upload' : 'external_upload',
@@ -172,6 +192,7 @@ export class ExternalUpdateRequestsService {
         originalFilename: dto.documentOriginalFilename,
         replacementMode: 'archive_current',
       });
+      createdDocumentId = document.id;
     }
 
     if (row.request.requestType === 'cover_image_update' || row.request.allowCoverUpdate) {
@@ -192,10 +213,17 @@ export class ExternalUpdateRequestsService {
       type: `external_${row.request.requestType}_received`,
       titleAr: 'تم استلام تحديث من الجمعية',
       bodyAr: `${row.mosque.name} - رقم ${row.mosque.officialCode} - بلدية ${row.mosque.commune} أرسل تحديثًا جديدًا.`,
-      metadataJson: { externalRequestId: row.request.id, requestType: row.request.requestType },
-    });
+        metadataJson: {
+          targetType: 'external_request_completed',
+          mosqueId: row.request.mosqueId,
+          externalRequestId: row.request.id,
+          documentId: createdDocumentId ?? row.request.relatedDocumentId ?? undefined,
+          consumptionId: createdConsumptionId,
+          progressionId: createdProgressionId,
+          requestType: row.request.requestType,
+        },
+      });
 
     return { status: 'completed', request: completed };
   }
 }
-

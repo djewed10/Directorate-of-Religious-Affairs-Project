@@ -1,11 +1,11 @@
 import { router } from 'expo-router';
-import { FileCog, LogOut, Moon, Shield } from 'lucide-react-native';
 import { StyleSheet, View } from 'react-native';
 import { AppCard } from '@/components/AppCard';
 import { AppText } from '@/components/AppText';
 import { Screen } from '@/components/Screen';
 import { ThemedButton } from '@/components/ThemedButton';
 import { useAuth } from '@/auth/AuthProvider';
+import { GearSix, IconBadge, MoonStars, ShieldCheck, SignOut } from '@/components/ui';
 import { useAppTheme } from '@/theme/theme';
 
 export default function SettingsScreen() {
@@ -18,28 +18,28 @@ export default function SettingsScreen() {
         <AppText color={colors.muted}>إدارة الأنواع، المستخدمين، والتفضيلات</AppText>
       </View>
       <AppCard style={styles.card}>
-        <Shield color={colors.primary} size={24} />
+        <IconBadge icon={ShieldCheck} tone="primary" size={46} iconSize={23} />
         <View style={styles.cardText}>
           <AppText variant="subtitle">{user?.name}</AppText>
           <AppText color={colors.muted}>{user?.email} - {user?.role}</AppText>
         </View>
       </AppCard>
       <AppCard onPress={() => router.push('/document-types')} style={styles.menu}>
-        <FileCog color={colors.primary} size={22} />
+        <IconBadge icon={GearSix} tone="primary" size={40} iconSize={21} />
         <AppText>إدارة أنواع الوثائق</AppText>
       </AppCard>
       <AppCard style={styles.menu}>
-        <Moon color={colors.primary} size={22} />
+        <IconBadge icon={MoonStars} tone="primary" size={40} iconSize={21} />
         <AppText>الوضع الداكن/الفاتح يتبع إعداد الجهاز</AppText>
       </AppCard>
-      <ThemedButton title="تسجيل الخروج" icon={LogOut} tone="danger" onPress={logout} />
+      <ThemedButton title="تسجيل الخروج" icon={SignOut} tone="danger" onPress={logout} />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
@@ -48,9 +48,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   menu: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
 });
-

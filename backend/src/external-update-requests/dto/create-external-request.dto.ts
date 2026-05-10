@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsUUID, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 import type { ExternalRequestType } from '../../db/schema';
 
 export class CreateExternalRequestDto {
@@ -26,6 +26,7 @@ export class CreateExternalRequestDto {
   @ApiPropertyOptional({ default: 14 })
   @IsInt()
   @Min(1)
+  @Max(100, { message: 'أقصى مدة مسموحة هي 100 يوم' })
   @IsOptional()
   expiresInDays?: number;
 
@@ -39,4 +40,3 @@ export class CreateExternalRequestDto {
   @IsOptional()
   allowCoverUpdate?: boolean;
 }
-

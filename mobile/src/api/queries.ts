@@ -14,8 +14,12 @@ export const api = {
   mosqueWallet: (id: string) => apiFetch<any>(`/mosques/${id}/wallet`),
   search: (query: Record<string, string | number | undefined>) => apiFetch<MosqueListRow[]>('/search', { query }),
   documentTypes: () => apiFetch<DocumentType[]>('/document-types'),
+  publicDocumentTypes: () => apiFetch<DocumentType[]>('/document-types/public'),
   reference: () => apiFetch<ReferenceData>('/reference'),
-  notifications: () => apiFetch<unknown[]>('/notifications'),
+  notifications: (query?: Record<string, string | number | boolean | undefined>) => apiFetch<unknown[]>('/notifications', { query }),
+  unreadNotifications: () => apiFetch<{ count: number }>('/notifications/unread-count'),
+  signedViewUrl: (key: string) => apiFetch<{ url: string | null; expiresIn: number }>('/storage/view-url', { query: { key } }),
+  suggestions: (field: string, q?: string) => apiFetch<string[]>('/reference/suggestions', { query: { field, q } }),
   signUpload: (body: { mimeType: string; originalFilename: string; folder?: string; fileSize?: number }) =>
     apiFetch<{ storageKey: string; uploadUrl: string; method: string; headers: Record<string, string> }>(
       '/storage/uploads/sign',

@@ -1,12 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { Save } from 'lucide-react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { z } from 'zod';
-import { apiFetch } from '@/api/client';
+import { apiFetch, uploadToSignedUrl } from '@/api/client';
 import { api } from '@/api/queries';
 import { AppCard } from '@/components/AppCard';
 import { AppText } from '@/components/AppText';
@@ -15,9 +14,13 @@ import { Screen } from '@/components/Screen';
 import { SearchBar } from '@/components/SearchBar';
 import { ThemedButton } from '@/components/ThemedButton';
 import { ThemedInput } from '@/components/ThemedInput';
+import { UploadPicker, type PickedUpload } from '@/components/UploadPicker';
 import { useAuth } from '@/auth/AuthProvider';
+import { ToastMessages, useToast } from '@/components/ui';
+import { FloppyDisk } from '@/components/ui/icons';
 import { useAppTheme } from '@/theme/theme';
-import type { MosqueListRow } from '@/types/api';
+import type { Mosque, MosqueListRow } from '@/types/api';
+import { buildUploadFilename, uploadDateStamp } from '@/utils/uploadNames';
 
 const schema = z.object({
   mosqueId: z.string().min(1),
@@ -34,28 +37,59 @@ export default function AidFormScreen() {
   const { token, loading } = useAuth();
   const params = useLocalSearchParams<{ mosqueId?: string }>();
   const { colors } = useAppTheme();
+  const toast = useToast();
   const queryClient = useQueryClient();
   const [q, setQ] = useState('');
+  const [files, setFiles] = useState<PickedUpload[]>([]);
   const mosques = useQuery({ queryKey: ['aid-mosques', q], queryFn: () => api.mosques({ q, limit: 8 }), enabled: !!token && !params.mosqueId });
-  const { control, handleSubmit, formState } = useForm<AidForm>({
+  const { control, handleSubmit, watch, formState } = useForm<AidForm>({
     resolver: zodResolver(schema),
     defaultValues: {
       mosqueId: params.mosqueId ?? '',
       amount: '',
       aidDate: new Date().toISOString().slice(0, 10),
-      sourceType: 'grant',
+      sourceType: 'friday_donations',
       referenceNumber: '',
       notes: '',
     },
   });
+  const selectedMosqueId = watch('mosqueId');
+  const selectedMosque = (mosques.data as MosqueListRow[] | undefined)?.find((row) => row.mosque.id === selectedMosqueId);
+  const mosqueDetails = useQuery({
+    queryKey: ['aid-upload-mosque', selectedMosqueId],
+    queryFn: () => api.mosque(selectedMosqueId) as Promise<{ mosque: Mosque }>,
+    enabled: !!token && !!selectedMosqueId,
+  });
+  const mosqueCode = selectedMosque?.mosque.officialCode ?? mosqueDetails.data?.mosque.officialCode ?? selectedMosqueId;
   const mutation = useMutation({
-    mutationFn: (values: AidForm) =>
-      apiFetch('/aid-records', { method: 'POST', body: { ...values, amount: Number(values.amount) } }),
+    mutationFn: async (values: AidForm) => {
+      let attachment: Record<string, unknown> = {};
+      const file = files[0];
+      if (file) {
+        if (file.mimeType !== 'application/pdf') throw new Error('يرجى اختيار ملف PDF للمرفق');
+        const generatedFilename = buildUploadFilename(['aid', mosqueCode || values.mosqueId, values.aidDate || uploadDateStamp()], 'pdf');
+        const signed = await api.signUpload({
+          mimeType: file.mimeType,
+          originalFilename: generatedFilename,
+          folder: `mosques/${values.mosqueId}/aids`,
+          fileSize: file.size,
+        });
+        await uploadToSignedUrl(signed.uploadUrl, file.uri, file.mimeType);
+        attachment = {
+          attachmentStorageKey: signed.storageKey,
+          attachmentMimeType: file.mimeType,
+          attachmentFileSize: file.size,
+          attachmentOriginalFilename: generatedFilename,
+        };
+      }
+      return apiFetch('/aid-records', { method: 'POST', body: { ...values, amount: Number(values.amount), ...attachment } });
+    },
     onSuccess: async (_data, values) => {
       await queryClient.invalidateQueries({ queryKey: ['aids', values.mosqueId] });
-      router.replace(`/mosques/${values.mosqueId}`);
+      toast.success(ToastMessages.saveSuccess);
+      router.replace({ pathname: '/mosques/[id]', params: { id: values.mosqueId, section: 'aids' } });
     },
-    onError: (error) => Alert.alert('تعذر الحفظ', error instanceof Error ? error.message : 'خطأ غير معروف'),
+    onError: (error) => toast.error(error instanceof Error ? error.message : ToastMessages.saveError),
   });
 
   if (!loading && !token) return <Redirect href="/login" />;
@@ -93,7 +127,8 @@ export default function AidFormScreen() {
         <Controller control={control} name="sourceType" render={({ field }) => <ThemedInput label="المصدر (grant/friday_donations/other)" value={field.value} onChangeText={field.onChange} />} />
         <Controller control={control} name="referenceNumber" render={({ field }) => <ThemedInput label="المرجع" value={field.value} onChangeText={field.onChange} />} />
         <Controller control={control} name="notes" render={({ field }) => <ThemedInput label="ملاحظات" value={field.value} onChangeText={field.onChange} multiline />} />
-        <ThemedButton title="حفظ الاستفادة" icon={Save} disabled={formState.isSubmitting || mutation.isPending} onPress={handleSubmit((values) => mutation.mutate(values))} />
+        <UploadPicker value={files} onChange={(next) => setFiles(next.slice(0, 1))} documentMode compact />
+        <ThemedButton title="حفظ الاستفادة" icon={FloppyDisk} disabled={formState.isSubmitting || mutation.isPending} loading={formState.isSubmitting || mutation.isPending} onPress={handleSubmit((values) => mutation.mutate(values))} />
       </AppCard>
     </Screen>
   );

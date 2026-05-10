@@ -110,6 +110,14 @@ EXPO_PUBLIC_ENABLE_NATIVE_OCR=true
 
 On web or when OCR is unavailable, the app shows a manual fallback. Extraction logic picks the longest numeric official-code candidates and parses common date formats such as `dd/MM/yyyy`, `dd-MM-yyyy`, and `yyyy-MM-dd`.
 
+## Push Notification Images
+
+The Android app icon is configured from the directorate logo, and the notification small icon uses the Expo notification config plugin.
+
+Remote rich notification images are best-effort. When a notification is tied to a mosque with an HTTPS cover image URL, the backend adds `richContent.image` to the Expo push payload while keeping the existing navigation `data` fields unchanged. Android can display the image through Expo Push Service; iOS requires a Notification Service Extension for remote images. Local development storage URLs and expired signed URLs will fall back to the app notification icon.
+
+ملاحظة: صور إشعارات المساجد تعتمد على دعم المنصة ورابط صورة HTTPS صالح؛ إذا لم تتوفر الشروط يظهر شعار التطبيق كبديل دون تغيير منطق فتح الإشعار.
+
 ## Implemented MVP
 
 - JWT login and secure token storage.
@@ -136,7 +144,7 @@ On web or when OCR is unavailable, the app shows a manual fallback. Extraction l
 - `official_code` is unique and visible across search/detail cards.
 - Expiration notifications are created only when `expiration_date` exists.
 - Documents that do not support expiration hide the expiration input in the app.
-- Multiple scanned pages are represented as multiple uploaded media/documents in this MVP; generating a single merged PDF package is a future enhancement.
+- Multiple scanned pages can be converted in-app into a single printable PDF package for document-style uploads.
 
 ## TODOs
 
@@ -144,7 +152,5 @@ On web or when OCR is unavailable, the app shows a manual fallback. Extraction l
 - Add full user-management screens in the app.
 - Add association create/edit screens in the app.
 - Add native ML Kit OCR dependency in a custom Expo dev client.
-- Add PDF merge/generation for multi-page scans.
 - Add Expo push delivery service; DB notifications are already the source of truth.
 - Add automated API/e2e tests.
-

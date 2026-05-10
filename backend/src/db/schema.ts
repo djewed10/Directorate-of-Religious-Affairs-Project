@@ -139,6 +139,10 @@ export const aidRecords = pgTable(
     sourceType: text('source_type').$type<'friday_donations' | 'grant' | 'other'>(),
     referenceNumber: text('reference_number'),
     notes: text('notes'),
+    attachmentStorageKey: text('attachment_storage_key'),
+    attachmentMimeType: text('attachment_mime_type'),
+    attachmentFileSize: integer('attachment_file_size'),
+    attachmentOriginalFilename: text('attachment_original_filename'),
     ...timestamps,
   },
   (table) => ({

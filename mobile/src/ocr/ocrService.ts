@@ -1,5 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { ENABLE_NATIVE_OCR } from '@/config/env';
 import { extractOcrValues, type OcrExtraction } from './extractors';
 
@@ -28,20 +28,21 @@ function loadNativeOcr(): NativeOcrModule | null {
 
 export async function scanImageForOcr(officialCodeRegex?: string): Promise<OcrExtraction | null> {
   if (Platform.OS === 'web') {
-    Alert.alert('OCR غير متوفر', 'استخراج النص بالكاميرا متاح في تطبيق الهاتف فقط. يمكن الإدخال يدويًا.');
     return null;
   }
-  await ImagePicker.requestCameraPermissionsAsync();
-  const result = await ImagePicker.launchCameraAsync({ quality: 0.85 });
-  if (result.canceled) return null;
-
   const nativeOcr = loadNativeOcr();
   if (!nativeOcr) {
-    Alert.alert('OCR غير مفعل', 'هذا البناء لا يحتوي وحدة OCR المحلية. استعمل الإدخال اليدوي أو ابن Custom Dev Client.');
     return null;
   }
+
+  const permission = await ImagePicker.requestCameraPermissionsAsync();
+  if (!permission.granted) {
+    throw new Error('لا يمكن فتح الكاميرا بدون صلاحية الوصول');
+  }
+
+  const result = await ImagePicker.launchCameraAsync({ quality: 0.85 });
+  if (result.canceled) return null;
 
   const text = await nativeOcr.recognizeText(result.assets[0].uri);
   return extractOcrValues(text, officialCodeRegex);
 }
-

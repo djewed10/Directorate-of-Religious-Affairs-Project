@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, ilike, isNotNull, sql } from 'drizzle-orm';
 import { DB, type AppDb } from '../db/database.module';
-import { consumptionCategories, mosqueStatuses, ocrConfigs, progressionStages } from '../db/schema';
+import { associations, consumptionCategories, mosqueStatuses, mosques, ocrConfigs, progressionStages } from '../db/schema';
 
 @Injectable()
 export class ReferenceService {
@@ -20,5 +20,38 @@ export class ReferenceService {
     ]);
     return { statuses, stages, categories, ocrConfig: ocrConfig[0] ?? null };
   }
-}
 
+  async suggestions(field: string, q?: string) {
+    const pattern = `%${q ?? ''}%`;
+    const limit = 12;
+    if (field === 'association') {
+      const rows = await this.db
+        .select({ value: associations.name })
+        .from(associations)
+        .where(q ? ilike(associations.name, pattern) : undefined)
+        .orderBy(asc(associations.name))
+        .limit(limit);
+      return rows.map((row) => row.value);
+    }
+
+    const column =
+      field === 'commune'
+        ? mosques.commune
+        : field === 'daira'
+          ? mosques.daira
+          : field === 'address'
+            ? mosques.address
+            : field === 'classification'
+              ? mosques.classification
+              : null;
+    if (!column) return [];
+    const rows = await this.db
+      .select({ value: column })
+      .from(mosques)
+      .where(q ? ilike(column, pattern) : isNotNull(column))
+      .groupBy(column)
+      .orderBy(sql`count(*) desc`, asc(column))
+      .limit(limit);
+    return rows.map((row) => row.value).filter(Boolean);
+  }
+}

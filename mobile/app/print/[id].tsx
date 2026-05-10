@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { Redirect, useLocalSearchParams } from 'expo-router';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, Share, StyleSheet, View } from 'react-native';
 import { api } from '@/api/queries';
 import { AppCard } from '@/components/AppCard';
 import { AppText } from '@/components/AppText';
 import { Screen } from '@/components/Screen';
 import { StatusBadge } from '@/components/StatusBadge';
+import { ThemedButton } from '@/components/ThemedButton';
 import { useAuth } from '@/auth/AuthProvider';
+import { ToastMessages, useToast } from '@/components/ui';
 import { useAppTheme } from '@/theme/theme';
 import type { Mosque } from '@/types/api';
 import { dateAr, money } from '@/utils/format';
@@ -21,6 +23,7 @@ export default function PrintSummaryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { token, loading } = useAuth();
   const { colors } = useAppTheme();
+  const toast = useToast();
   const detail = useQuery({ queryKey: ['print-mosque', id], queryFn: () => api.mosque(id) as Promise<DetailResponse>, enabled: !!id && !!token });
   if (!loading && !token) return <Redirect href="/login" />;
   const mosque = detail.data?.mosque;
@@ -28,8 +31,19 @@ export default function PrintSummaryScreen() {
     <Screen>
       {Platform.OS === 'web' ? (
         <Pressable onPress={() => window.print()} style={[styles.printButton, { backgroundColor: colors.primary }]}>
-          <AppText color="#FFFFFF">طباعة</AppText>
+          <AppText color={colors.onPrimary}>طباعة</AppText>
         </Pressable>
+      ) : mosque ? (
+        <ThemedButton
+          title="مشاركة الملخص"
+          onPress={async () => {
+            try {
+              await Share.share({ message: buildSummaryText(mosque, detail.data?.association?.name) });
+            } catch {
+              toast.error(ToastMessages.saveError);
+            }
+          }}
+        />
       ) : null}
       {mosque ? (
         <AppCard style={styles.summary}>
@@ -42,17 +56,32 @@ export default function PrintSummaryScreen() {
           </View>
           <Info label="الجمعية" value={detail.data?.association?.name ?? 'غير محددة'} />
           <Info label="تبرعات الجمعة" value={mosque.receivesFridayDonations ? 'نعم' : 'لا'} />
-          <Info label="تكلفة الإكمال المقدرة" value={`${money(mosque.estimatedCompletionCost)} دج`} />
+          {isProjectStatus(mosque.mosqueStatus) ? <Info label="تكلفة الإكمال المقدرة" value={`${money(mosque.estimatedCompletionCost)} دج`} /> : null}
           <Info label="إجمالي الاستفادات" value={`${money(mosque.totalAidAmount)} دج`} />
           <Info label="إجمالي الاستهلاك" value={`${money(mosque.totalConsumedAmount)} دج`} />
           <Info label="آخر استفادة" value={dateAr(mosque.lastAidDate)} />
-          <Info label="نسبة التقدم" value={`${mosque.currentProgressPercent ?? 0}%`} />
+          {isProjectStatus(mosque.mosqueStatus) ? <Info label="نسبة التقدم" value={`${mosque.currentProgressPercent ?? 0}%`} /> : null}
           <Info label="الوثائق المنتهية" value={String(detail.data?.documentSummary?.expired ?? 0)} />
           <Info label="الوثائق التي ستنتهي قريبًا" value={String(detail.data?.documentSummary?.expiringSoon ?? 0)} />
         </AppCard>
       ) : null}
     </Screen>
   );
+}
+
+function isProjectStatus(status: string) {
+  return status === 'under_construction' || status === 'renovation';
+}
+
+function buildSummaryText(mosque: Mosque, associationName?: string | null) {
+  return [
+    mosque.name,
+    `الرقم الرسمي: ${mosque.officialCode}`,
+    `البلدية: ${mosque.commune}`,
+    `الجمعية: ${associationName ?? 'غير محددة'}`,
+    `إجمالي الاستفادات: ${money(mosque.totalAidAmount)} دج`,
+    `إجمالي الاستهلاك: ${money(mosque.totalConsumedAmount)} دج`,
+  ].join('\n');
 }
 
 function Info({ label, value }: { label: string; value: string }) {
@@ -76,7 +105,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   header: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
   },
@@ -85,10 +114,9 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   info: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     justifyContent: 'space-between',
     borderBottomWidth: StyleSheet.hairlineWidth,
     paddingBottom: 8,
   },
 });
-

@@ -18,7 +18,17 @@ function withQuery(path: string, query?: Query) {
 }
 
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
-  const token = await authStorage.getToken();
+  const rawToken = await authStorage.getToken();
+  let token: string | null = rawToken ? String(rawToken) : null;
+  // sanitize common storage issues: quoted JSON strings or already-prefixed 'Bearer '
+  if (token && token.startsWith('"') && token.endsWith('"')) token = token.slice(1, -1);
+  if (token && token.toLowerCase().startsWith('bearer ')) token = token.slice(7);
+  // DEBUG: log API URL and token presence for troubleshooting
+  try {
+    // Avoid logging full token in production; show presence and first chars
+    // eslint-disable-next-line no-console
+    console.log('[apiFetch] url=', API_URL + path, 'tokenPresent=', !!token, token ? `${String(token).slice(0,8)}...` : null);
+  } catch (e) {}
   const headers = new Headers(options.headers);
   headers.set('Accept', 'application/json');
   if (!(options.body instanceof FormData) && options.body !== undefined) {
@@ -38,6 +48,15 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
   if (!response.ok) {
+    // If unauthorized, clear storage to avoid repeated 401s from stale/corrupt tokens
+    if (response.status === 401) {
+      try {
+        await authStorage.clear();
+      } catch (e) {}
+      try {
+        if (typeof window !== 'undefined') window.location.reload();
+      } catch (e) {}
+    }
     const message =
       typeof data?.error?.message === 'string'
         ? data.error.message

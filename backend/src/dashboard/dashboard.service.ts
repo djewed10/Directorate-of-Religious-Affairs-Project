@@ -80,6 +80,21 @@ export class DashboardService {
       .orderBy(desc(consumptionUpdates.createdAt))
       .limit(8);
 
+    const latestDocuments = await this.db
+      .select({
+        document: documents,
+        documentTypeLabel: documentTypes.labelAr,
+        mosqueName: mosques.name,
+        officialCode: mosques.officialCode,
+        commune: mosques.commune,
+      })
+      .from(documents)
+      .innerJoin(mosques, eq(documents.mosqueId, mosques.id))
+      .innerJoin(documentTypes, eq(documents.documentTypeId, documentTypes.id))
+      .where(eq(documents.isActive, true))
+      .orderBy(desc(documents.uploadedAt))
+      .limit(8);
+
     const lastAidMosque = await this.db
       .select()
       .from(mosques)
@@ -148,6 +163,7 @@ export class DashboardService {
       },
       latestProgression,
       latestConsumption,
+      latestDocuments,
       lastAidMosque: lastAidMosque[0] ?? null,
       top: {
         needFollowUp: topNeedFollowUp,

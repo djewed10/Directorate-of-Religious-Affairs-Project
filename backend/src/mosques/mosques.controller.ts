@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CreateMosqueDto } from './dto/create-mosque.dto';
 import { UpdateMosqueDto } from './dto/update-mosque.dto';
@@ -30,6 +30,11 @@ export class MosquesController {
     return this.mosquesService.update(id, dto);
   }
 
+  @Delete(':id')
+  delete(@Param('id') id: string) {
+    return this.mosquesService.delete(id);
+  }
+
   @Get(':id/wallet')
   wallet(@Param('id') id: string) {
     return this.mosquesService.wallet(id);
@@ -40,4 +45,3 @@ export class MosquesController {
     return this.mosquesService.notes(id);
   }
 }
-

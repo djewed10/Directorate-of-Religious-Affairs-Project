@@ -11,8 +11,13 @@ export class AidRecordsController {
   constructor(private readonly aidRecordsService: AidRecordsService) {}
 
   @Get()
-  list(@Query('mosqueId') mosqueId?: string) {
-    return this.aidRecordsService.list(mosqueId);
+  list(@Query() query: { mosqueId?: string; page?: number; limit?: number }) {
+    return this.aidRecordsService.list(query);
+  }
+
+  @Get(':id')
+  get(@Param('id') id: string) {
+    return this.aidRecordsService.get(id);
   }
 
   @Post()
@@ -30,4 +35,3 @@ export class AidRecordsController {
     return this.aidRecordsService.delete(id);
   }
 }
-

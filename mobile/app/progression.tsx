@@ -7,11 +7,13 @@ import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { TimelineCard } from '@/components/TimelineCard';
 import { useAuth } from '@/auth/AuthProvider';
+import { useToast } from '@/components/ui';
 import { useAppTheme } from '@/theme/theme';
 
 export default function ProgressionScreen() {
   const { token, loading } = useAuth();
   const { colors } = useAppTheme();
+  const toast = useToast();
   const progression = useQuery({ queryKey: ['progression-latest'], queryFn: () => apiFetch<any[]>('/progression'), enabled: !!token });
   if (!loading && !token) return <Redirect href="/login" />;
   return (
@@ -23,7 +25,20 @@ export default function ProgressionScreen() {
       {progression.isLoading ? <ActivityIndicator color={colors.primary} /> : null}
       <View style={styles.list}>
         {progression.data?.map((item) => (
-          <TimelineCard key={item.id} title={item.stageCode ?? 'تحديث تقدم'} date={item.createdAt} note={item.shortNote} badge={item.progressPercent !== null ? `${item.progressPercent}%` : undefined} />
+          <TimelineCard
+            key={item.id}
+            title={item.stageCode ?? 'تحديث تقدم'}
+            date={item.createdAt}
+            note={item.shortNote}
+            badge={item.progressPercent !== null ? `${item.progressPercent}%` : undefined}
+            onPress={() => {
+              if (!item.mosqueId) {
+                toast.error('لا يمكن فتح تفاصيل هذا التحديث لعدم توفر رقم المسجد');
+                return;
+              }
+              router.push({ pathname: '/mosques/[id]', params: { id: item.mosqueId, section: 'progression', progressionId: item.id } });
+            }}
+          />
         ))}
       </View>
       {!progression.isLoading && !progression.data?.length ? <EmptyState title="لا توجد تحديثات" /> : null}
@@ -36,4 +51,3 @@ const styles = StyleSheet.create({
     gap: 10,
   },
 });
-

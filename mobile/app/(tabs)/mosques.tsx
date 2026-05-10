@@ -1,19 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
-import { Plus } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { api } from '@/api/queries';
-import { AppCard } from '@/components/AppCard';
 import { AppText } from '@/components/AppText';
 import { EmptyState } from '@/components/EmptyState';
 import { FilterChips } from '@/components/FilterChips';
 import { Screen } from '@/components/Screen';
 import { SearchBar } from '@/components/SearchBar';
-import { StatusBadge } from '@/components/StatusBadge';
 import { ThemedButton } from '@/components/ThemedButton';
+import { MosqueCard } from '@/components/ui';
+import { Plus } from '@/components/ui/icons';
 import { useAppTheme } from '@/theme/theme';
-import { money } from '@/utils/format';
 
 const statusFilters = [
   { key: '', label: 'الكل' },
@@ -24,15 +22,46 @@ const statusFilters = [
   { key: 'receives_friday', label: 'تبرعات الجمعة' },
 ];
 
+const validStatusKeys = new Set(statusFilters.map((item) => item.key));
+
+function normalizeStatusParam(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (!raw) return '';
+  return validStatusKeys.has(raw) ? raw : '';
+}
+
 export default function MosquesScreen() {
+  const params = useLocalSearchParams<{ filter?: string }>();
   const { colors } = useAppTheme();
   const [q, setQ] = useState('');
-  const [filter, setFilter] = useState('');
+  const [filter, setFilter] = useState(normalizeStatusParam(params.filter));
+  const [page, setPage] = useState(1);
+  const [rows, setRows] = useState<Awaited<ReturnType<typeof api.mosques>>>([]);
   const query = useMemo(() => {
-    if (filter === 'receives_friday') return { q, receivesFridayDonations: true };
-    return { q, status: filter || undefined };
-  }, [filter, q]);
+    if (filter === 'receives_friday') return { q, receivesFridayDonations: true, page, limit: 20 };
+    return { q, status: filter || undefined, page, limit: 20 };
+  }, [filter, page, q]);
   const mosques = useQuery({ queryKey: ['mosques', query], queryFn: () => api.mosques(query) });
+
+  useEffect(() => {
+    setFilter(normalizeStatusParam(params.filter));
+  }, [params.filter]);
+
+  const handleFilterChange = (nextFilter: string) => {
+    const normalized = normalizeStatusParam(nextFilter);
+    setFilter(normalized);
+    router.push({ pathname: '/mosques', params: normalized ? { filter: normalized } : {} });
+  };
+
+  useEffect(() => {
+    setPage(1);
+    setRows([]);
+  }, [filter, q]);
+
+  useEffect(() => {
+    if (!mosques.data) return;
+    setRows((current) => (page === 1 ? mosques.data : [...current, ...mosques.data]));
+  }, [mosques.data, page]);
 
   return (
     <Screen>
@@ -44,34 +73,24 @@ export default function MosquesScreen() {
         <ThemedButton title="إضافة" icon={Plus} onPress={() => router.push('/mosques/new')} />
       </View>
       <SearchBar value={q} onChangeText={setQ} />
-      <FilterChips chips={statusFilters} value={filter} onChange={setFilter} />
+      <FilterChips chips={statusFilters} value={filter} onChange={handleFilterChange} />
       {mosques.isLoading ? <ActivityIndicator color={colors.primary} /> : null}
-      {!mosques.isLoading && !mosques.data?.length ? <EmptyState title="لا توجد نتائج" /> : null}
+      {!mosques.isLoading && !rows.length ? <EmptyState title="لا توجد نتائج" /> : null}
       <View style={styles.list}>
-        {mosques.data?.map((row) => (
-          <AppCard key={row.mosque.id} onPress={() => router.push(`/mosques/${row.mosque.id}`)} style={styles.item}>
-            <View style={styles.itemHead}>
-              <View style={styles.titleBlock}>
-                <AppText variant="subtitle" numberOfLines={1}>{row.mosque.name}</AppText>
-                <AppText variant="caption" color={colors.info}>رقم {row.mosque.officialCode} - {row.mosque.commune}</AppText>
-              </View>
-              <StatusBadge status={row.mosque.mosqueStatus} />
-            </View>
-            <View style={styles.metrics}>
-              <AppText variant="caption" color={colors.muted}>الجمعية: {row.associationName ?? 'غير محددة'}</AppText>
-              <AppText variant="caption" color={colors.muted}>الاستفادات: {money(row.mosque.totalAidAmount)} دج</AppText>
-              <AppText variant="caption" color={colors.muted}>الاستهلاك: {money(row.mosque.totalConsumedAmount)} دج</AppText>
-            </View>
-          </AppCard>
+        {rows.map((row, index) => (
+          <MosqueCard key={row.mosque.id} row={row} index={index} onPress={() => router.push(`/mosques/${row.mosque.id}`)} />
         ))}
       </View>
+      {(mosques.data?.length ?? 0) === 20 ? (
+        <ThemedButton title="تحميل المزيد" tone="neutral" loading={mosques.isFetching && page > 1} onPress={() => setPage((value) => value + 1)} />
+      ) : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   header: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 10,
@@ -79,22 +98,4 @@ const styles = StyleSheet.create({
   list: {
     gap: 10,
   },
-  item: {
-    gap: 12,
-  },
-  itemHead: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  titleBlock: {
-    flex: 1,
-    gap: 4,
-  },
-  metrics: {
-    flexDirection: 'row-reverse',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
 });
-

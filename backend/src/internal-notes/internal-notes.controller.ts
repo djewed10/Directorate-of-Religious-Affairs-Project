@@ -1,8 +1,9 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/auth-user.decorator';
 import type { AuthUser } from '../common/types';
 import { CreateInternalNoteDto } from './dto/create-internal-note.dto';
+import { UpdateInternalNoteDto } from './dto/update-internal-note.dto';
 import { InternalNotesService } from './internal-notes.service';
 
 @ApiTags('internal-notes')
@@ -26,9 +27,13 @@ export class InternalNotesController {
     return this.internalNotesService.create(dto, user);
   }
 
+  @Patch('internal-notes/:id')
+  update(@Param('id') id: string, @Body() dto: UpdateInternalNoteDto) {
+    return this.internalNotesService.update(id, dto);
+  }
+
   @Delete('internal-notes/:id')
   delete(@Param('id') id: string) {
     return this.internalNotesService.delete(id);
   }
 }
-

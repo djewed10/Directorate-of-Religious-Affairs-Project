@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createReadStream, existsSync, mkdirSync } from 'node:fs';
 import { join, normalize } from 'node:path';
+import os from 'node:os';
 import { nanoid } from 'nanoid';
 import { SignUploadDto } from './dto/sign-upload.dto';
 
@@ -52,7 +53,8 @@ export class StorageService {
       };
     }
 
-    const appBaseUrl = this.config.get<string>('APP_BASE_URL', 'http://localhost:3000');
+    const appBaseUrl = this.resolveAppBaseUrl();
+
     return {
       driver: 'local',
       storageKey,
@@ -61,6 +63,61 @@ export class StorageService {
       method: 'PUT',
       headers: { 'Content-Type': dto.mimeType },
     };
+  }
+
+  async signViewUrl(storageKey: string) {
+    if (!storageKey) return { url: null, expiresIn: 0 };
+    if (this.driver === 's3') {
+      const bucket = this.config.getOrThrow<string>('S3_BUCKET');
+      const command = new GetObjectCommand({
+        Bucket: bucket,
+        Key: storageKey,
+      });
+      return {
+        url: await getSignedUrl(this.s3!, command, { expiresIn: 900 }),
+        expiresIn: 900,
+      };
+    }
+
+    const appBaseUrl = this.resolveAppBaseUrl();
+    return {
+      url: `${appBaseUrl}/api/storage/local/${encodeURIComponent(storageKey)}`,
+      expiresIn: 0,
+    };
+  }
+
+  private resolveAppBaseUrl() {
+    const configured = this.config.get<string>('APP_BASE_URL', 'http://localhost:3000');
+    try {
+      const parsed = new URL(configured);
+      const hostname = parsed.hostname;
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        const ip = this.getLocalIp();
+        if (ip) {
+          const port = parsed.port ? `:${parsed.port}` : '';
+          return `${parsed.protocol}//${ip}${port}`;
+        }
+      }
+      return configured;
+    } catch (e) {
+      const ip = this.getLocalIp();
+      if (ip) return `http://${ip}:3000`;
+      return 'http://localhost:3000';
+    }
+  }
+
+  private getLocalIp(): string | null {
+    const nets = os.networkInterfaces();
+    for (const name of Object.keys(nets)) {
+      const net = nets[name];
+      if (!net) continue;
+      for (const ni of net) {
+        if ((ni as any).family === 'IPv4' && !(ni as any).internal) {
+          return (ni as any).address;
+        }
+      }
+    }
+    return null;
   }
 
   getLocalPath(storageKey: string) {
@@ -72,4 +129,3 @@ export class StorageService {
     return createReadStream(this.getLocalPath(storageKey));
   }
 }
-

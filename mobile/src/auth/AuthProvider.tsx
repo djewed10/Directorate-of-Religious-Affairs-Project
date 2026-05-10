@@ -1,5 +1,6 @@
 import { api } from '@/api/queries';
 import { authStorage } from '@/storage/secureStore';
+import { registerPushToken, setupNotificationHandler } from '@/notifications/push-handler';
 import type { AuthUser } from '@/types/api';
 import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react';
 
@@ -19,12 +20,21 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Set up notification handler once on app start
+    const cleanupNotificationHandler = setupNotificationHandler();
+    
     Promise.all([authStorage.getToken(), authStorage.getUser<AuthUser>()])
       .then(([savedToken, savedUser]) => {
         setToken(savedToken);
         setUser(savedUser);
+        // If we have a saved token, try to register push token
+        if (savedToken && savedUser) {
+          registerPushToken();
+        }
       })
       .finally(() => setLoading(false));
+
+    return cleanupNotificationHandler;
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -38,6 +48,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
         await authStorage.setSession(response.accessToken, authUser);
         setToken(response.accessToken);
         setUser(authUser);
+        // DEBUG: confirm we stored token
+        try {
+          // eslint-disable-next-line no-console
+          console.log('[AuthProvider] login success, tokenStored=', !!response.accessToken, String(response.accessToken).slice(0,8) + '...');
+        } catch (e) {}
+        // Register push token after login
+        await registerPushToken();
       },
       async logout() {
         await authStorage.clear();

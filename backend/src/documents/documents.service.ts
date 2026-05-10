@@ -1,11 +1,13 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import { CurrentUser } from '../common/auth-user.decorator';
+import { pageLimit } from '../common/pagination';
 import type { AuthUser } from '../common/types';
 import { DB, type AppDb } from '../db/database.module';
 import { documentTypes, documentVersions, documents } from '../db/schema';
 import { MosquesService } from '../mosques/mosques.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { UpdateDocumentDto } from './dto/update-document.dto';
 
 @Injectable()
 export class DocumentsService {
@@ -14,7 +16,8 @@ export class DocumentsService {
     private readonly mosquesService: MosquesService,
   ) {}
 
-  async list(query?: { mosqueId?: string; documentTypeId?: string; status?: string }) {
+  async list(query?: { mosqueId?: string; documentTypeId?: string; status?: string; page?: number; limit?: number }) {
+    const { limit, offset } = pageLimit(query?.page, query?.limit ?? 30);
     const filters = [eq(documents.isActive, true)];
     if (query?.mosqueId) filters.push(eq(documents.mosqueId, query.mosqueId));
     if (query?.documentTypeId) filters.push(eq(documents.documentTypeId, query.documentTypeId));
@@ -26,7 +29,9 @@ export class DocumentsService {
       .from(documents)
       .innerJoin(documentTypes, eq(documents.documentTypeId, documentTypes.id))
       .where(and(...filters))
-      .orderBy(desc(documents.uploadedAt));
+      .orderBy(desc(documents.uploadedAt))
+      .limit(limit)
+      .offset(offset);
   }
 
   async get(id: string) {
@@ -151,6 +156,39 @@ export class DocumentsService {
       .orderBy(desc(documentVersions.versionNumber));
   }
 
+  async update(id: string, dto: UpdateDocumentDto) {
+    const current = await this.get(id);
+    let nextType = current.type;
+    if (dto.documentTypeId && dto.documentTypeId !== current.document.documentTypeId) {
+      const [type] = await this.db.select().from(documentTypes).where(eq(documentTypes.id, dto.documentTypeId)).limit(1);
+      if (!type) throw new NotFoundException('Document type not found');
+      nextType = type;
+    }
+    if (!nextType.supportsExpiration && dto.expirationDate) {
+      throw new BadRequestException('This document type does not support expiration dates');
+    }
+
+    const [updated] = await this.db
+      .update(documents)
+      .set({
+        documentTypeId: dto.documentTypeId ?? current.document.documentTypeId,
+        issueDate: dto.issueDate === undefined ? current.document.issueDate : dto.issueDate,
+        expirationDate:
+          dto.expirationDate === undefined
+            ? current.document.expirationDate
+            : nextType.supportsExpiration
+              ? dto.expirationDate
+              : null,
+        isPinned: dto.isPinned === undefined ? current.document.isPinned : dto.isPinned,
+        updatedAt: new Date(),
+      })
+      .where(eq(documents.id, id))
+      .returning();
+    if (!updated) throw new NotFoundException('Document not found');
+    await this.mosquesService.touch(updated.mosqueId);
+    return this.get(id);
+  }
+
   async softDelete(id: string) {
     const [deleted] = await this.db
       .update(documents)
@@ -162,4 +200,3 @@ export class DocumentsService {
     return deleted;
   }
 }
-

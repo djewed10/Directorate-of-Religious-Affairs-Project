@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsIn, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateAidRecordDto {
   @ApiProperty()
@@ -28,5 +28,24 @@ export class CreateAidRecordDto {
   @IsString()
   @IsOptional()
   notes?: string;
-}
 
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  attachmentStorageKey?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  attachmentMimeType?: string;
+
+  @ApiPropertyOptional()
+  @IsInt()
+  @IsOptional()
+  attachmentFileSize?: number;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  attachmentOriginalFilename?: string;
+}

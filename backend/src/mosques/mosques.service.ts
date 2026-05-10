@@ -45,7 +45,7 @@ export class MosquesService {
     if (query?.receivesFridayDonations !== undefined) {
       filters.push(eq(mosques.receivesFridayDonations, String(query.receivesFridayDonations) === 'true'));
     }
-    if (query?.activeOnly === true || query?.activeOnly === 'true') {
+    if (query?.activeOnly !== false && query?.activeOnly !== 'false') {
       filters.push(eq(mosques.isActive, true));
     }
 
@@ -114,25 +114,37 @@ export class MosquesService {
   async create(dto: CreateMosqueDto) {
     const existing = await this.db.select().from(mosques).where(eq(mosques.officialCode, dto.officialCode)).limit(1);
     if (existing[0]) throw new ConflictException('Official code already exists');
+    const values = this.normalizeMosquePayload(dto);
     const [created] = await this.db
       .insert(mosques)
       .values({
-        ...dto,
-        mosqueStatus: dto.mosqueStatus ?? 'under_construction',
-        receivesFridayDonations: dto.receivesFridayDonations ?? true,
+        ...values,
+        mosqueStatus: values.mosqueStatus ?? 'under_construction',
+        receivesFridayDonations: values.receivesFridayDonations ?? true,
       })
       .returning();
     return created;
   }
 
   async update(id: string, dto: UpdateMosqueDto) {
+    const values = this.normalizeMosquePayload(dto);
     const [updated] = await this.db
       .update(mosques)
-      .set({ ...dto, updatedAt: new Date(), lastActivityAt: new Date() })
+      .set({ ...values, updatedAt: new Date(), lastActivityAt: new Date() })
       .where(eq(mosques.id, id))
       .returning();
     if (!updated) throw new NotFoundException('Mosque not found');
     return updated;
+  }
+
+  async delete(id: string) {
+    const [deleted] = await this.db
+      .update(mosques)
+      .set({ isActive: false, updatedAt: new Date(), lastActivityAt: new Date() })
+      .where(eq(mosques.id, id))
+      .returning();
+    if (!deleted) throw new NotFoundException('Mosque not found');
+    return deleted;
   }
 
   async wallet(id: string) {
@@ -225,5 +237,15 @@ export class MosquesService {
     if (!mosque) throw new NotFoundException('Mosque not found');
     return mosque;
   }
-}
 
+  private normalizeMosquePayload<T extends CreateMosqueDto | UpdateMosqueDto>(dto: T): T {
+    const next = { ...dto, wilaya: 'وهران' };
+    const status = next.mosqueStatus;
+    if (status === 'completed' || status === 'neighborhood_no_friday') {
+      next.currentProgressPercent = null as never;
+      next.estimatedTotalProjectCost = null as never;
+      next.estimatedCompletionCost = null as never;
+    }
+    return next as T;
+  }
+}

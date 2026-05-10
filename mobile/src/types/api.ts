@@ -94,6 +94,13 @@ export interface TimelineMedia {
 
 export interface DashboardSummary {
   cards: Record<string, number>;
+  latestDocuments: Array<{
+    document: Record<string, unknown>;
+    documentTypeLabel: string;
+    mosqueName: string;
+    officialCode: string;
+    commune: string;
+  }>;
   latestProgression: Array<{ update: Record<string, unknown>; mosqueName: string; officialCode: string; commune: string }>;
   latestConsumption: Array<{ update: Record<string, unknown>; mosqueName: string; officialCode: string; commune: string }>;
   lastAidMosque?: Mosque | null;
@@ -112,4 +119,3 @@ export interface ReferenceData {
   categories: Array<{ code: string; labelAr: string }>;
   ocrConfig?: { officialCodeRegex: string; dateRegex: string } | null;
 }
-

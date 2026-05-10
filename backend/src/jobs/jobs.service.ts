@@ -4,6 +4,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { and, eq, inArray, lte, or, sql } from 'drizzle-orm';
 import { DB, type AppDb } from '../db/database.module';
 import { documents, externalUpdateRequests, mosques, notifications, users } from '../db/schema';
+import { ExpoPushService } from './expo-push.service';
 
 @Injectable()
 export class JobsService {
@@ -12,6 +13,7 @@ export class JobsService {
   constructor(
     @Inject(DB) private readonly db: AppDb,
     private readonly config: ConfigService,
+    private readonly expoPush: ExpoPushService,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
@@ -50,7 +52,11 @@ export class JobsService {
         type: 'document_expiring_soon',
         titleAr: 'وثيقة ستنتهي قريبًا',
         bodyAr: `${row.mosque.name} - رقم ${row.mosque.officialCode} - بلدية ${row.mosque.commune} لديه وثيقة ستنتهي قريبًا.`,
-        metadataJson: { documentId: row.document.id },
+        metadataJson: {
+          targetType: 'document_expiring',
+          mosqueId: row.mosque.id,
+          documentId: row.document.id,
+        },
       });
     }
     for (const row of expiredRows) {
@@ -59,7 +65,11 @@ export class JobsService {
         type: 'document_expired',
         titleAr: 'وثيقة منتهية',
         bodyAr: `${row.mosque.name} - رقم ${row.mosque.officialCode} - بلدية ${row.mosque.commune} لديه وثيقة منتهية.`,
-        metadataJson: { documentId: row.document.id },
+        metadataJson: {
+          targetType: 'document_expired',
+          mosqueId: row.mosque.id,
+          documentId: row.document.id,
+        },
       });
     }
     this.logger.log(`Expiration notifications checked: soon=${soonRows.length}, expired=${expiredRows.length}`);
@@ -85,7 +95,11 @@ export class JobsService {
         type: 'mosque_inactive',
         titleAr: 'مسجد يحتاج متابعة',
         bodyAr: `${mosque.name} - رقم ${mosque.officialCode} - بلدية ${mosque.commune} لم يرسل تحديثًا منذ ${days} يومًا.`,
-        metadataJson: { days },
+        metadataJson: {
+          targetType: 'mosque_inactive',
+          mosqueId: mosque.id,
+          days,
+        },
       });
     }
   }
@@ -106,6 +120,32 @@ export class JobsService {
       .where(and(eq(documents.isActive, false), sql`${documents.deletedAt} < now() - (${days} || ' days')::interval`));
   }
 
+  /**
+   * Debug method: Send a test notification to a specific user (for testing push notification pipeline)
+   */
+  async sendTestNotificationToUser(userId: string) {
+    this.logger.log(`[TEST] Creating test notification for userId: ${userId}`);
+    
+    const [created] = await this.db
+      .insert(notifications)
+      .values({
+        userId,
+        type: 'test',
+        titleAr: 'اختبار التنبيهات',
+        bodyAr: 'هذا تنبيه اختبار من backend للتحقق من pipeline الإرسال',
+        metadataJson: { test: true, targetType: 'mosque_inactive' },
+      })
+      .returning();
+
+    this.logger.log(`[TEST] ✓ Test notification created: ${created.id}`);
+    
+    // Send push immediately
+    this.logger.log(`[TEST] Triggering push send for test notification`);
+    await this.expoPush.sendPushForNotification(created.id);
+    
+    return created;
+  }
+
   private staffUsers() {
     return this.db
       .select()
@@ -117,14 +157,27 @@ export class JobsService {
     staff: Array<typeof users.$inferSelect>,
     payload: Omit<typeof notifications.$inferInsert, 'userId'>,
   ) {
-    if (!staff.length) return;
-    await this.db.insert(notifications).values(
+    if (!staff.length) {
+      this.logger.log(`[NOTIFY] No staff members found, skipping notification`);
+      return;
+    }
+    
+    this.logger.log(`[NOTIFY] Creating notification for ${staff.length} staff member(s) - Type: ${payload.type}`);
+    
+    const created = await this.db.insert(notifications).values(
       staff.map((user) => ({
         ...payload,
         userId: user.id,
         metadataJson: payload.metadataJson ?? {},
       })),
-    );
+    ).returning();
+    
+    this.logger.log(`[NOTIFY] ✓ Created ${created.length} notification(s) in database`);
+    
+    // Send push notifications for each created notification
+    for (const notif of created) {
+      this.logger.log(`[NOTIFY] Triggering push send for notification ${notif.id} (userId: ${notif.userId})`);
+      await this.expoPush.sendPushForNotification(notif.id);
+    }
   }
 }
-

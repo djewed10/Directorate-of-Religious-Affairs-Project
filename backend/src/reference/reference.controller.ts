@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ReferenceService } from './reference.service';
 
@@ -12,5 +12,9 @@ export class ReferenceController {
   all() {
     return this.referenceService.all();
   }
-}
 
+  @Get('suggestions')
+  suggestions(@Query('field') field: string, @Query('q') q?: string) {
+    return this.referenceService.suggestions(field, q);
+  }
+}
