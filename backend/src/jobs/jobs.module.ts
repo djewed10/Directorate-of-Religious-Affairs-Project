@@ -8,6 +8,6 @@ import { StorageModule } from '../storage/storage.module';
   imports: [StorageModule],
   controllers: [JobsController],
   providers: [JobsService, ExpoPushService],
-  exports: [ExpoPushService],
+  exports: [JobsService, ExpoPushService],
 })
 export class JobsModule {}

@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { apiFetch, uploadToSignedUrl } from '@/api/client';
 import { api } from '@/api/queries';
@@ -16,6 +16,7 @@ import { SmartSearchInput, ToastMessages, useToast } from '@/components/ui';
 import { CheckCircle, PaperPlaneTilt } from '@/components/ui/icons';
 import { useAppTheme } from '@/theme/theme';
 import type { DocumentType } from '@/types/api';
+import { isValidGoogleMapsUrl } from '@/utils/maps';
 import { buildUploadFilename, uploadDateStamp, uploadExtension } from '@/utils/uploadNames';
 
 type PublicRequest = {
@@ -25,12 +26,15 @@ type PublicRequest = {
     expiresAt: string;
     allowProgressionFields: boolean;
     allowCoverUpdate: boolean;
+    allowLocationUpdate: boolean;
   };
   mosque: {
     id: string;
     name: string;
     officialCode: string;
     commune: string;
+    addressText?: string | null;
+    googleMapsUrl?: string | null;
   };
 };
 
@@ -42,6 +46,8 @@ export default function ExternalFormScreen() {
   const [note, setNote] = useState('');
   const [progressPercent, setProgressPercent] = useState('');
   const [progressionNote, setProgressionNote] = useState('');
+  const [addressText, setAddressText] = useState('');
+  const [googleMapsUrl, setGoogleMapsUrl] = useState('');
   const [consumptionFiles, setConsumptionFiles] = useState<PickedUpload[]>([]);
   const [progressionFiles, setProgressionFiles] = useState<PickedUpload[]>([]);
   const [documentFiles, setDocumentFiles] = useState<PickedUpload[]>([]);
@@ -60,9 +66,17 @@ export default function ExternalFormScreen() {
     queryFn: api.publicDocumentTypes,
     enabled: request.data?.request.requestType === 'document_upload' || request.data?.request.requestType === 'document_renewal',
   });
+
+  useEffect(() => {
+    if (!request.data?.request.allowLocationUpdate) return;
+    setAddressText(request.data.mosque.addressText ?? '');
+    setGoogleMapsUrl(request.data.mosque.googleMapsUrl ?? '');
+  }, [request.data]);
+
   const submit = useMutation({
     mutationFn: async () => {
       if (!request.data) throw new Error('الطلب غير موجود');
+      if (googleMapsUrl.trim() && !isValidGoogleMapsUrl(googleMapsUrl)) throw new Error('رابط خرائط Google غير صالح');
       const mosqueId = request.data.mosque.id;
       const mosqueCode = request.data.mosque.officialCode;
       const consumptionMedia = [];
@@ -128,6 +142,11 @@ export default function ExternalFormScreen() {
         body.coverImageStorageKey = signed.storageKey;
       }
 
+      if (request.data.request.allowLocationUpdate) {
+        body.addressText = addressText.trim() || undefined;
+        body.googleMapsUrl = googleMapsUrl.trim() || undefined;
+      }
+
       await apiFetch(`/external/${token}/submit`, { method: 'POST', body });
     },
     onSuccess: () => {
@@ -166,6 +185,7 @@ export default function ExternalFormScreen() {
   }
 
   const type = request.data.request.requestType;
+  const canUpdateLocation = request.data.request.allowLocationUpdate;
   return (
     <Screen>
       <AppCard style={styles.identity}>
@@ -213,6 +233,26 @@ export default function ExternalFormScreen() {
         <AppCard style={styles.form}>
           <AppText variant="subtitle">صورة الغلاف</AppText>
           <UploadPicker value={documentFiles} onChange={(files) => setDocumentFiles(files.filter((file) => file.mimeType.startsWith('image/')).slice(0, 1))} imageOnly />
+        </AppCard>
+      ) : null}
+
+      {canUpdateLocation ? (
+        <AppCard style={styles.form}>
+          <AppText variant="subtitle">الموقع</AppText>
+          <ThemedInput
+            label="العنوان النصي"
+            placeholder="مثال: حي خميستي، بلدية السانية"
+            value={addressText}
+            onChangeText={setAddressText}
+          />
+          <ThemedInput
+            label="رابط Google Maps"
+            placeholder="الصق رابط الموقع من خرائط Google"
+            value={googleMapsUrl}
+            onChangeText={setGoogleMapsUrl}
+            autoCapitalize="none"
+            keyboardType="url"
+          />
         </AppCard>
       ) : null}
 

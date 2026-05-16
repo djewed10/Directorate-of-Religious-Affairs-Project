@@ -61,6 +61,7 @@ export default function NewRequestScreen() {
           expiresAt: expiresAt || undefined,
           allowProgressionFields: type === 'consumption_control',
           allowCoverUpdate: type === 'cover_image_update',
+          allowLocationUpdate: type === 'cover_image_update',
         },
       });
     },

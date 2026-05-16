@@ -15,6 +15,13 @@
       "when": 1777780000000,
       "tag": "0001_aid_record_attachments",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778367600000,
+      "tag": "0002_mosque_location_fields",
+      "breakpoints": true
     }
   ]
 }

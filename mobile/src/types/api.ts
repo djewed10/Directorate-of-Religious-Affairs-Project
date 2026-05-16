@@ -32,6 +32,8 @@ export interface Mosque {
   daira?: string | null;
   wilaya?: string | null;
   address?: string | null;
+  addressText?: string | null;
+  googleMapsUrl?: string | null;
   zoneType: 'urban' | 'rural' | 'semi_urban';
   mosqueStatus: MosqueStatusCode;
   receivesFridayDonations: boolean;

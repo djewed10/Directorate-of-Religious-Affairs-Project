@@ -39,4 +39,9 @@ export class CreateExternalRequestDto {
   @IsBoolean()
   @IsOptional()
   allowCoverUpdate?: boolean;
+
+  @ApiPropertyOptional()
+  @IsBoolean()
+  @IsOptional()
+  allowLocationUpdate?: boolean;
 }

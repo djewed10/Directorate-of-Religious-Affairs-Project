@@ -1,11 +1,16 @@
 {
   "expo": {
-    "name": "ملفات المساجد",
-    "slug": "mosque-dossiers",
+    "name": "تطبيق مَدَد",
+    "slug": "maded-app",
     "version": "0.1.0",
     "orientation": "portrait",
-    "icon": "./assets/app-icon.png",
+    "icon": "./assets/icon.png",
     "scheme": "mosquedossiers",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "userInterfaceStyle": "automatic",
     "assetBundlePatterns": [
       "**/*"
@@ -26,7 +31,7 @@
         "foregroundImage": "./assets/app-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.djewed.mosquedossiers",
+      "package": "com.mounir.maded",
       "googleServicesFile": "./google-services.json"
     },
     "web": {
@@ -42,7 +47,7 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#0f766e"
+          "color": "#111827"
         }
       ],
       "expo-sharing"
@@ -50,8 +55,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "2f82fe40-1d05-4975-a0db-cafd58cadad2"
+        "projectId": "b1e148c7-21f0-4495-9550-f9ce7dc6e14c"
       }
-    }
+    },
+    "owner": "djewed"
   }
 }

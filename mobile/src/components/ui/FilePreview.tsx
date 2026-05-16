@@ -1,8 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Image, ImageStyle } from 'expo-image';
 import { File, Paths } from 'expo-file-system';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 import { Linking, Modal, Platform, Pressable, Share, StyleProp, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '@/api/queries';
@@ -66,11 +64,15 @@ export async function shareStorageFile(storageKey: string, fallbackMessage?: (me
   try {
     const signed = await api.signedViewUrl(storageKey);
     if (!signed.url) throw new Error('لا يمكن عرض هذا الملف');
-    if (Platform.OS !== 'web' && (await Sharing.isAvailableAsync())) {
+    if (Platform.OS !== 'web') {
       try {
-        const localUri = await downloadSignedUrlToCache(signed.url, storageKey);
-        await Sharing.shareAsync(localUri, { mimeType: mimeTypeFromStorageKey(storageKey) });
-        return;
+        const Sharing = await import('expo-sharing');
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          const localUri = await downloadSignedUrlToCache(signed.url, storageKey);
+          await Sharing.shareAsync(localUri, { mimeType: mimeTypeFromStorageKey(storageKey) });
+          return;
+        }
       } catch {
         // Some platforms require a local file URI; fall back to sharing the signed URL.
       }
@@ -91,6 +93,8 @@ export async function printStorageFile(storageKey: string, fallbackMessage?: (me
       return;
     }
     const localUri = await downloadSignedUrlToCache(signed.url, storageKey);
+    // Import expo-print only when needed (native platforms only)
+    const Print = await import('expo-print');
     await Print.printAsync({ uri: localUri });
   } catch {
     fallbackMessage?.('يمكنك فتح الملف أو مشاركته للطباعة من تطبيق خارجي');

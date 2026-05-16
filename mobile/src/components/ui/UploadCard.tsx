@@ -2,9 +2,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
-import * as Print from 'expo-print';
 import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, View, Alert, Image as RNImage } from 'react-native';
+import { Pressable, StyleSheet, View, Alert, Image as RNImage, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { AppCard } from './AppCard';
@@ -38,62 +37,8 @@ function base64Size(base64?: string) {
   return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
 }
 
-async function centerCropUriToAspect(uri: string, targetAspect: number) {
-  return new Promise<ImageManipulator.ImageResult>((resolve, reject) => {
-    RNImage.getSize(
-      uri,
-      async (width, height) => {
-        try {
-          const currentAspect = width / height;
-          let cropWidth = width;
-          let cropHeight = height;
-          if (currentAspect > targetAspect) {
-            cropWidth = Math.round(height * targetAspect);
-            cropHeight = height;
-          } else {
-            cropHeight = Math.round(width / targetAspect);
-            cropWidth = width;
-          }
-          const originX = Math.round((width - cropWidth) / 2);
-          const originY = Math.round((height - cropHeight) / 2);
-          const result = await ImageManipulator.manipulateAsync(
-            uri,
-            [{ crop: { originX, originY, width: cropWidth, height: cropHeight } }],
-            { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: true },
-          );
-          resolve(result);
-        } catch (e) {
-          reject(e);
-        }
-      },
-      (err) => reject(err),
-    );
-  });
-}
-
-function askCropForPickedUpload(file: PickedUpload) {
-  return new Promise<PickedUpload>((resolve) => {
-    Alert.alert(
-      'اقتصاص الصورة',
-      'هل تريد اقتصاص الصورة لمطابقة نسبة صفحة الطباعة (A4) لتحسين جودة الطباعة؟',
-      [
-        {
-          text: 'اقتصاص',
-          onPress: async () => {
-            try {
-              const cropped = await centerCropUriToAspect(file.uri, 210 / 297);
-              resolve({ ...file, uri: cropped.uri, size: base64Size(cropped.base64) });
-            } catch {
-              resolve(file);
-            }
-          },
-        },
-        { text: 'ابقَ كما هو', onPress: () => resolve(file) },
-      ],
-      { cancelable: true, onDismiss: () => resolve(file) },
-    );
-  });
-}
+// interactive cropper state
+const noop = () => {};
 
 function formatSize(value?: number) {
   const size = Number(value ?? 0);
@@ -136,6 +81,10 @@ async function fileSize(uri: string) {
 }
 
 async function createPdfFromScanPages(pages: ScanPage[]): Promise<PickedUpload> {
+  if (Platform.OS === 'web') {
+    throw new Error('عذراً، ميزة إنشاء ملفات PDF غير مدعومة على المتصفح. يرجى استخدام التطبيق على الهاتف (Android/iOS).');
+  }
+
   if (!pages.length) throw new Error('يرجى مسح صفحة واحدة على الأقل');
   const html = `<!doctype html>
 <html dir="rtl">
@@ -153,6 +102,8 @@ async function createPdfFromScanPages(pages: ScanPage[]): Promise<PickedUpload> 
     ${pages.map((page) => `<section class="page"><img src="data:image/jpeg;base64,${page.base64}" /></section>`).join('')}
   </body>
 </html>`;
+  // Import expo-print only when needed (native platforms only)
+  const Print = await import('expo-print');
   const printed = await Print.printToFileAsync({ html });
   return {
     uri: printed.uri,
@@ -282,18 +233,17 @@ export function UploadPicker({
       if (fromCamera && !(await ensureCameraPermission())) return;
       if (!fromCamera && !(await ensureMediaLibraryPermission())) return;
       const result = fromCamera
-        ? await ImagePicker.launchCameraAsync({ quality: 0.8, allowsEditing: false })
+        ? await ImagePicker.launchCameraAsync({ quality: 0.8, allowsEditing: true })
         : await ImagePicker.launchImageLibraryAsync({
             quality: 0.85,
-            allowsMultipleSelection: true,
+            allowsEditing: true, // we use editing instead of multiple selection for cropping
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
           });
       if (!result.canceled) {
         const prepared: PickedUpload[] = [];
         for (const asset of result.assets) {
           const compressed = await compressImage(asset);
-          const final = await askCropForPickedUpload(compressed);
-          prepared.push(final);
+          prepared.push(compressed);
         }
         onChange([...value, ...prepared]);
       }
@@ -309,10 +259,10 @@ export function UploadPicker({
     setBusy(true);
     try {
       if (!(await ensureCameraPermission())) return;
-      const result = await ImagePicker.launchCameraAsync({ quality: 0.9, allowsEditing: false });
+      const result = await ImagePicker.launchCameraAsync({ quality: 0.9, allowsEditing: true }); // enable native crop
       if (!result.canceled && result.assets[0]) {
-        const page = await scanPage(result.assets[0]);
-        setScanPages((current) => [...current, page]);
+        const scanned = await scanPage(result.assets[0]);
+        setScanPages((current) => [...current, scanned]);
       }
     } catch {
       toast.error('تعذر فتح الكاميرا أو إنشاء صفحة المسح');

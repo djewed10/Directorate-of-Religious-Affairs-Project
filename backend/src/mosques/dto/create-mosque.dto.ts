@@ -6,9 +6,11 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUrl,
   IsUUID,
   Max,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import type { MosqueStatusCode, ZoneType } from '../../db/schema';
 
@@ -44,6 +46,17 @@ export class CreateMosqueDto {
   @IsString()
   @IsOptional()
   address?: string;
+
+  @ApiPropertyOptional({ example: 'حي خميستي، بلدية السانية' })
+  @IsString()
+  @IsOptional()
+  addressText?: string | null;
+
+  @ApiPropertyOptional({ example: 'https://maps.app.goo.gl/...' })
+  @ValidateIf((dto: CreateMosqueDto) => dto.googleMapsUrl !== undefined && dto.googleMapsUrl !== null && dto.googleMapsUrl !== '')
+  @IsUrl({}, { message: 'رابط خرائط Google غير صالح' })
+  @IsOptional()
+  googleMapsUrl?: string | null;
 
   @ApiPropertyOptional()
   @IsString()
@@ -104,4 +117,3 @@ export class CreateMosqueDto {
   @IsOptional()
   coverImageStorageKey?: string;
 }
-

@@ -1,0 +1,16 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^Set-Location \"C:/Users/Click/Desktop/ING4-PROJETCT\"; Get-ChildItem -Recurse -Force -File \\| Select-String -Pattern \"192\\\\\\.168\\\\\\.1\\\\\\.99\" \\| ForEach-Object \\{ \"\\{0\\}:\\{1\\}:\\{2\\}\" -f \\$_\\.Path, \\$_\\.LineNumber, \\$_\\.Line\\.Trim\\(\\) \\}$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd \"C:\\\\Users\\\\Click\\\\Desktop\\\\ING4-PROJETCT\\\\mobile\" ; python -c \"\nfrom PIL import Image\nimport os\n\n# Load the logo\nlogo_path = 'assets/religious-directorate-logos/religious-directorate-logo-white\\.webp'\nlogo = Image\\.open\\(logo_path\\)\n\n# Create icon \\(1024x1024\\) with white background\nicon_size = \\(1024, 1024\\)\nicon = Image\\.new\\('RGBA', icon_size, \\(255, 255, 255, 255\\)\\)\n\n# Resize logo to fit in the square while maintaining aspect ratio\nlogo\\.thumbnail\\(\\(900, 900\\), Image\\.Resampling\\.LANCZOS\\)\n\n# Paste logo in center\noffset = \\(\\(icon_size\\[0\\] - logo\\.size\\[0\\]\\) // 2, \\(icon_size\\[1\\] - logo\\.size\\[1\\]\\) // 2\\)\nif logo\\.mode == 'RGBA':\n    icon\\.paste\\(logo, offset, logo\\)\nelse:\n    icon\\.paste\\(logo, offset\\)\n\n# Save icon\nicon\\.convert\\('RGB'\\)\\.save\\('assets/icon\\.png', 'PNG'\\)\nprint\\('✓ Icon created: assets/icon\\.png \\(1024x1024\\)'\\)\n\n# Create splash screen \\(1284x2778 for mobile\\) with white background\nsplash_size = \\(1284, 2778\\)\nsplash = Image\\.new\\('RGB', splash_size, \\(255, 255, 255\\)\\)\n\n# Resize logo to fit splash\nlogo2 = Image\\.open\\(logo_path\\)\nlogo2\\.thumbnail\\(\\(600, 600\\), Image\\.Resampling\\.LANCZOS\\)\n\n# Paste logo in center-top area\noffset_splash = \\(\\(splash_size\\[0\\] - logo2\\.size\\[0\\]\\) // 2, 600\\)\nif logo2\\.mode == 'RGBA':\n    splash\\.paste\\(logo2, offset_splash, logo2\\)\nelse:\n    splash\\.paste\\(logo2, offset_splash\\)\n\n# Save splash\nsplash\\.save\\('assets/splash\\.png', 'PNG'\\)\nprint\\('✓ Splash screen created: assets/splash\\.png \\(1284x2778\\)'\\)\n\"\n$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^eas project:init --force --non-interactive$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

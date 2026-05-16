@@ -29,6 +29,7 @@ export function MosqueCard({
   const item = mosque ?? row?.mosque;
   if (!item) return null;
   const association = associationName ?? row?.associationName;
+  const locationLabel = item.addressText;
   return (
     <AppCard onPress={onPress} onLongPress={onLongPress} enteringDelay={index * 45} style={{ gap: spacing.md }}>
       <View style={styles.head}>
@@ -50,6 +51,11 @@ export function MosqueCard({
               <AppText variant="caption" color={colors.primary}>
                 رقم {item.officialCode} - {item.commune}
               </AppText>
+              {locationLabel ? (
+                <AppText variant="caption" color={colors.textSecondary} numberOfLines={1}>
+                  {locationLabel}
+                </AppText>
+              ) : null}
             </View>
           </View>
         </View>

@@ -20,6 +20,7 @@ import { BottomSheet, StorageImage, ToastMessages, useToast } from '@/components
 import { Camera, FloppyDisk, Mosque as MosqueIcon, Trash } from '@/components/ui/icons';
 import { scanImageForOcr } from '@/ocr/ocrService';
 import { useAppTheme } from '@/theme/theme';
+import { isValidGoogleMapsUrl, openGoogleMapsUrl } from '@/utils/maps';
 import { buildUploadFilename, uploadDateStamp, uploadExtension } from '@/utils/uploadNames';
 
 const allowedAddStatuses = ['under_construction', 'completed', 'renovation', 'neighborhood_no_friday'];
@@ -30,6 +31,8 @@ const schema = z.object({
   commune: z.string().min(2, 'يرجى إدخال البلدية'),
   daira: z.string().optional(),
   address: z.string().optional(),
+  addressText: z.string().optional(),
+  googleMapsUrl: z.string().optional().refine((value) => isValidGoogleMapsUrl(value), 'رابط خرائط Google غير صالح'),
   mosqueStatus: z.string(),
   receivesFridayDonations: z.boolean(),
   currentProgressPercent: z.string().optional(),
@@ -63,6 +66,8 @@ export default function MosqueFormScreen() {
       commune: '',
       daira: '',
       address: '',
+      addressText: '',
+      googleMapsUrl: '',
       mosqueStatus: 'under_construction',
       receivesFridayDonations: true,
       currentProgressPercent: '',
@@ -79,6 +84,8 @@ export default function MosqueFormScreen() {
         commune: existing.data.mosque.commune,
         daira: existing.data.mosque.daira ?? '',
         address: existing.data.mosque.address ?? '',
+        addressText: existing.data.mosque.addressText ?? '',
+        googleMapsUrl: existing.data.mosque.googleMapsUrl ?? '',
         mosqueStatus: existing.data.mosque.mosqueStatus,
         receivesFridayDonations: existing.data.mosque.receivesFridayDonations,
         currentProgressPercent: String(existing.data.mosque.currentProgressPercent ?? ''),
@@ -128,6 +135,8 @@ export default function MosqueFormScreen() {
           daira: values.daira || undefined,
           wilaya: 'وهران',
           address: values.address || undefined,
+          addressText: values.addressText || (params.id ? null : undefined),
+          googleMapsUrl: values.googleMapsUrl || (params.id ? null : undefined),
           mosqueStatus: values.mosqueStatus,
           receivesFridayDonations: values.receivesFridayDonations,
           currentProgressPercent: showProjectFields && values.currentProgressPercent ? Number(values.currentProgressPercent) : undefined,
@@ -212,6 +221,41 @@ export default function MosqueFormScreen() {
           </View>
           <AutocompleteField control={control} name="daira" label="الدائرة" field="daira" optional />
           <AutocompleteField control={control} name="address" label="العنوان" field="address" optional />
+          <Controller
+            control={control}
+            name="addressText"
+            render={({ field, fieldState }) => (
+              <ThemedInput
+                label="العنوان النصي"
+                placeholder="مثال: حي خميستي، بلدية السانية"
+                value={field.value ?? ''}
+                onChangeText={field.onChange}
+                error={fieldState.error?.message}
+                returnKeyType="next"
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="googleMapsUrl"
+            render={({ field, fieldState }) => (
+              <View style={styles.locationLink}>
+                <ThemedInput
+                  label="رابط Google Maps"
+                  placeholder="الصق رابط الموقع من خرائط Google"
+                  value={field.value ?? ''}
+                  onChangeText={field.onChange}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                  error={fieldState.error?.message}
+                  returnKeyType="next"
+                />
+                {field.value ? (
+                  <ThemedButton title="فتح في خرائط Google" tone="neutral" onPress={() => field.value && openGoogleMapsUrl(field.value, toast.error)} />
+                ) : null}
+              </View>
+            )}
+          />
         </FormSection>
 
         <FormSection title="الحالة">
@@ -373,6 +417,9 @@ const styles = StyleSheet.create({
   },
   readOnly: {
     gap: 4,
+  },
+  locationLink: {
+    gap: 8,
   },
   pick: {
     gap: 4,

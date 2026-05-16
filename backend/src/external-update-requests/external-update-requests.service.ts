@@ -67,6 +67,7 @@ export class ExternalUpdateRequestsService {
         createdByUserId: user.sub,
         allowProgressionFields: dto.allowProgressionFields ?? dto.requestType === 'consumption_control',
         allowCoverUpdate: dto.allowCoverUpdate ?? dto.requestType === 'cover_image_update',
+        allowLocationUpdate: dto.allowLocationUpdate ?? dto.requestType === 'cover_image_update',
       })
       .returning();
     const mobileBase = this.config.get<string>('MOBILE_PUBLIC_BASE_URL', 'http://localhost:8081');
@@ -100,6 +101,7 @@ export class ExternalUpdateRequestsService {
         expiresAt: row.request.expiresAt,
         allowProgressionFields: row.request.allowProgressionFields,
         allowCoverUpdate: row.request.allowCoverUpdate,
+        allowLocationUpdate: row.request.allowLocationUpdate,
       },
       mosque: {
         id: row.mosque.id,
@@ -107,6 +109,8 @@ export class ExternalUpdateRequestsService {
         officialCode: row.mosque.officialCode,
         commune: row.mosque.commune,
         mosqueStatus: row.mosque.mosqueStatus,
+        addressText: row.mosque.addressText,
+        googleMapsUrl: row.mosque.googleMapsUrl,
       },
     };
   }
@@ -199,6 +203,13 @@ export class ExternalUpdateRequestsService {
       if (dto.coverImageStorageKey) {
         await this.mosquesService.update(row.request.mosqueId, { coverImageStorageKey: dto.coverImageStorageKey });
       }
+    }
+
+    if (row.request.allowLocationUpdate && (dto.addressText !== undefined || dto.googleMapsUrl !== undefined)) {
+      await this.mosquesService.update(row.request.mosqueId, {
+        addressText: dto.addressText,
+        googleMapsUrl: dto.googleMapsUrl,
+      });
     }
 
     const [completed] = await this.db

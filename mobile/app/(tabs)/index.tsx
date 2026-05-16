@@ -85,6 +85,7 @@ type AttentionData = {
   meta: string;
   badge: string;
   mosqueId?: string;
+  section?: 'overview' | 'documents' | 'progression' | 'consumption';
   imageSource?: any;
   documentId?: string;
   consumptionId?: string;
@@ -539,7 +540,7 @@ function AttentionCard({ item, delay }: { item: AttentionData; delay: number }) 
       onPress={
         item.mosqueId
           ? () => {
-              const section = item.documentId ? 'documents' : item.consumptionId ? 'consumption' : item.progressionId ? 'progression' : 'overview';
+              const section = item.section ?? (item.documentId ? 'documents' : item.consumptionId ? 'consumption' : item.progressionId ? 'progression' : 'overview');
               void router.push({
                 pathname: '/mosques/[id]',
                 params: {
@@ -787,6 +788,7 @@ function buildAttentionItems(data: DashboardSummary): AttentionData[] {
           meta: `رقم ${expired.officialCode} · ${expired.commune} · ${expired.expiredCount} وثيقة منتهية`,
           badge: 'وثائق',
           mosqueId: expired.mosqueId,
+          section: 'documents',
           imageSource: uiImageIcons.documentsAlert,
         }
       : null,
@@ -800,6 +802,7 @@ function buildAttentionItems(data: DashboardSummary): AttentionData[] {
           meta: `آخر نشاط: ${dateAr(noUpdate.lastActivityAt)} · ${noUpdate.commune}`,
           badge: 'متابعة',
           mosqueId: noUpdate.id,
+          section: 'progression',
         }
       : null,
     proof
@@ -812,6 +815,7 @@ function buildAttentionItems(data: DashboardSummary): AttentionData[] {
           meta: `رقم ${proof.officialCode} · ${proof.commune} · ${proof.count} تحديث بدون إثبات كاف`,
           badge: 'استهلاك',
           mosqueId: proof.mosqueId,
+          section: 'consumption',
           imageSource: uiImageIcons.consumption,
         }
       : null,

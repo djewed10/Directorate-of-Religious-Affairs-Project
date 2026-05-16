@@ -1,11 +1,11 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
-import { CurrentUser } from '../common/auth-user.decorator';
 import { pageLimit } from '../common/pagination';
 import type { AuthUser } from '../common/types';
 import { DB, type AppDb } from '../db/database.module';
 import { documentTypes, documentVersions, documents } from '../db/schema';
 import { MosquesService } from '../mosques/mosques.service';
+import { JobsService } from '../jobs/jobs.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 
@@ -14,6 +14,7 @@ export class DocumentsService {
   constructor(
     @Inject(DB) private readonly db: AppDb,
     private readonly mosquesService: MosquesService,
+    @Inject(forwardRef(() => JobsService)) private readonly jobsService: JobsService,
   ) {}
 
   async list(query?: { mosqueId?: string; documentTypeId?: string; status?: string; page?: number; limit?: number }) {
@@ -144,6 +145,12 @@ export class DocumentsService {
       changeReason: 'new_upload',
     });
     await this.mosquesService.touch(dto.mosqueId);
+    
+    // Auto-trigger the notification evaluation to notify immediately
+    if (created.expirationDate) {
+      this.jobsService.createDocumentExpirationNotifications().catch(e => console.error('Error triggering document notifications', e));
+    }
+    
     return created;
   }
 
@@ -186,6 +193,12 @@ export class DocumentsService {
       .returning();
     if (!updated) throw new NotFoundException('Document not found');
     await this.mosquesService.touch(updated.mosqueId);
+    
+    // Auto-trigger the notification evaluation to notify immediately
+    if (updated.expirationDate) {
+       this.jobsService.createDocumentExpirationNotifications().catch(e => console.error('Error triggering document notifications', e));
+    }
+    
     return this.get(id);
   }
 

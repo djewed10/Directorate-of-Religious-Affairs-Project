@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsDateString, IsInt, IsNumber, IsOptional, IsString, IsUUID, Max, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsDateString, IsInt, IsNumber, IsOptional, IsString, IsUrl, IsUUID, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
 import { ConsumptionMediaDto } from '../../consumption/dto/consumption-media.dto';
 import { ProgressionMediaDto } from '../../progression/dto/progression-media.dto';
 
@@ -95,5 +95,15 @@ export class SubmitExternalRequestDto {
   @IsString()
   @IsOptional()
   coverImageStorageKey?: string;
-}
 
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  addressText?: string;
+
+  @ApiPropertyOptional()
+  @ValidateIf((dto: SubmitExternalRequestDto) => dto.googleMapsUrl !== undefined && dto.googleMapsUrl !== null && dto.googleMapsUrl !== '')
+  @IsUrl({}, { message: 'رابط خرائط Google غير صالح' })
+  @IsOptional()
+  googleMapsUrl?: string;
+}

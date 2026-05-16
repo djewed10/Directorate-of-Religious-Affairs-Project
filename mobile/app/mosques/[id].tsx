@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { apiFetch, uploadToSignedUrl } from '@/api/client';
 import { api } from '@/api/queries';
@@ -16,23 +16,24 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { ThemedButton } from '@/components/ThemedButton';
 import { ThemedInput } from '@/components/ThemedInput';
 import {
-  AnimatedModal,
-  BottomSheet,
-  FileActionRow,
-  ImageViewer,
-  MediaThumbStrip,
-  StorageImage,
-  ToastMessages,
-  openStorageFile,
-  printStorageFile,
-  shareStorageFile,
-  useToast,
+    AnimatedModal,
+    BottomSheet,
+    FileActionRow,
+    ImageViewer,
+    MediaThumbStrip,
+    StorageImage,
+    ToastMessages,
+    openStorageFile,
+    printStorageFile,
+    shareStorageFile,
+    useToast,
 } from '@/components/ui';
 import { UploadPicker, type PickedUpload } from '@/components/UploadPicker';
-import { ArrowLeft, FilePlus, FloppyDisk, HandCoins, Link, Mosque as MosqueIcon, Printer, ShareNetwork, Trash, TrendUp } from '@/components/ui/icons';
+import { ArrowLeft, FilePlus, FloppyDisk, HandCoins, Link, MapPin, Mosque as MosqueIcon, Printer, ShareNetwork, Trash, TrendUp } from '@/components/ui/icons';
 import { useAppTheme } from '@/theme/theme';
 import type { DocumentRow, Mosque, TimelineMedia } from '@/types/api';
 import { dateAr, money } from '@/utils/format';
+import { openGoogleMapsUrl } from '@/utils/maps';
 import { buildUploadFilename, uploadDateStamp, uploadExtension } from '@/utils/uploadNames';
 
 const sections = [
@@ -384,6 +385,25 @@ export default function MosqueDetailScreen() {
             <Info label="عدد مرات الاستفادة" value={String(mosque.aidCount)} />
           </AppCard>
           <AppCard style={styles.card}>
+            <View style={styles.locationHead}>
+              <MapPin color={colors.primary} size={22} weight="duotone" />
+              <AppText variant="subtitle">الموقع</AppText>
+            </View>
+            {mosque.addressText ? (
+              <AppText color={colors.textSecondary}>العنوان: {mosque.addressText}</AppText>
+            ) : (
+              <Info label="البلدية" value={mosque.commune} />
+            )}
+            {mosque.googleMapsUrl ? (
+              <ThemedButton
+                title="عرض الموقع على Google Maps"
+                icon={MapPin}
+                tone="neutral"
+                onPress={() => openGoogleMapsUrl(mosque.googleMapsUrl!, toast.error)}
+              />
+            ) : null}
+          </AppCard>
+          <AppCard style={styles.card}>
             <AppText variant="subtitle">حالة الوثائق</AppText>
             <Info label="المجموع" value={String(detail.data?.documentSummary?.total ?? 0)} />
             <Info label="منتهية" value={String(detail.data?.documentSummary?.expired ?? 0)} tone={colors.danger} />
@@ -543,6 +563,8 @@ export default function MosqueDetailScreen() {
           <Info label="الدائرة" value={mosque.daira ?? 'غير محددة'} />
           <Info label="الولاية" value={mosque.wilaya ?? 'وهران'} />
           <Info label="العنوان" value={mosque.address ?? 'غير محدد'} />
+          <Info label="العنوان النصي" value={mosque.addressText ?? 'غير محدد'} />
+          {mosque.googleMapsUrl ? <ThemedButton title="فتح في خرائط Google" icon={MapPin} tone="neutral" onPress={() => openGoogleMapsUrl(mosque.googleMapsUrl!, toast.error)} /> : null}
           <ThemedButton title="تعديل بيانات المسجد" tone="neutral" onPress={() => router.push({ pathname: '/mosques/new', params: { id } })} />
           <ThemedButton title="حذف المسجد" icon={Trash} tone="danger" onPress={() => setDeleteTarget({ type: 'mosque', id })} />
         </AppCard>
@@ -552,6 +574,7 @@ export default function MosqueDetailScreen() {
       <DocumentDetailSheet row={selectedDocument} mosque={mosque} mosqueId={id} onClose={() => setSelectedDocument(null)} onDelete={(docId) => setDeleteTarget({ type: 'document', id: docId })} />
       <ProgressionDetailSheet
         item={selectedProgression}
+        progressionRows={progressionRows}
         mosque={mosque}
         onClose={() => setSelectedProgression(null)}
         onDelete={(itemId) => setDeleteTarget({ type: 'progression', id: itemId })}
@@ -716,6 +739,7 @@ function DocumentDetailSheet({
 
 function ProgressionDetailSheet({
   item,
+  progressionRows,
   mosque,
   onClose,
   onDelete,
@@ -723,6 +747,7 @@ function ProgressionDetailSheet({
   onMediaPress,
 }: {
   item: ProgressionEntry | null;
+  progressionRows: ProgressionEntry[];
   mosque: Mosque;
   onClose: () => void;
   onDelete: (id: string) => void;
@@ -744,7 +769,7 @@ function ProgressionDetailSheet({
       const newPercent = progressPercent ? Number(progressPercent) : undefined;
       // find previous progression entry (the one immediately before this item)
       const previous = progressionRows
-        .filter((p) => p.createdAt < (item?.createdAt ?? ''))
+        .filter((progression) => progression.createdAt < (item?.createdAt ?? ''))
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
       if (newPercent !== undefined && previous && previous.progressPercent !== null && previous.progressPercent !== undefined && newPercent < previous.progressPercent) {
         throw new Error('نسبة التقدم لا يمكن أن تكون أقل من النسبة السابقة');
@@ -1056,6 +1081,11 @@ const styles = StyleSheet.create({
   },
   card: {
     gap: 10,
+  },
+  locationHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   info: {
     flexDirection: 'row',

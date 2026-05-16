@@ -239,7 +239,12 @@ export class MosquesService {
   }
 
   private normalizeMosquePayload<T extends CreateMosqueDto | UpdateMosqueDto>(dto: T): T {
-    const next = { ...dto, wilaya: 'وهران' };
+    const next = {
+      ...dto,
+      wilaya: 'وهران',
+      addressText: normalizeOptionalText(dto.addressText),
+      googleMapsUrl: normalizeOptionalText(dto.googleMapsUrl),
+    };
     const status = next.mosqueStatus;
     if (status === 'completed' || status === 'neighborhood_no_friday') {
       next.currentProgressPercent = null as never;
@@ -248,4 +253,11 @@ export class MosquesService {
     }
     return next as T;
   }
+}
+
+function normalizeOptionalText(value?: string | null) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
 }
