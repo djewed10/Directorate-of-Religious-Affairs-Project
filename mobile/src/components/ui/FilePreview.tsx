@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Image, ImageStyle } from 'expo-image';
 import { File, Paths } from 'expo-file-system';
+import * as Print from 'expo-print';
 import { Linking, Modal, Platform, Pressable, Share, StyleProp, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '@/api/queries';
@@ -93,8 +94,6 @@ export async function printStorageFile(storageKey: string, fallbackMessage?: (me
       return;
     }
     const localUri = await downloadSignedUrlToCache(signed.url, storageKey);
-    // Import expo-print only when needed (native platforms only)
-    const Print = await import('expo-print');
     await Print.printAsync({ uri: localUri });
   } catch {
     fallbackMessage?.('يمكنك فتح الملف أو مشاركته للطباعة من تطبيق خارجي');

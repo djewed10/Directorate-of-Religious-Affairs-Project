@@ -14,3 +14,7 @@ backend/storage-local/
 backend/uploads/
 *.tsbuildinfo
 
+
+# Firebase
+google-services.json
+GoogleService-Info.plist

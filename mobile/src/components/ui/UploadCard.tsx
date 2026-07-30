@@ -2,8 +2,9 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import * as Print from 'expo-print';
 import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, View, Alert, Image as RNImage, Platform } from 'react-native';
+import { Pressable, StyleSheet, View, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { AppCard } from './AppCard';
@@ -102,8 +103,7 @@ async function createPdfFromScanPages(pages: ScanPage[]): Promise<PickedUpload> 
     ${pages.map((page) => `<section class="page"><img src="data:image/jpeg;base64,${page.base64}" /></section>`).join('')}
   </body>
 </html>`;
-  // Import expo-print only when needed (native platforms only)
-  const Print = await import('expo-print');
+  
   const printed = await Print.printToFileAsync({ html });
   return {
     uri: printed.uri,
